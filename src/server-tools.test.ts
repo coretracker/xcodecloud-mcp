@@ -123,8 +123,66 @@ class FakeAppStoreConnectClient {
         data: {
           id: "build-run-1",
           type: "ciBuildRuns",
-          attributes: { completionStatus: "SUCCEEDED" },
+          attributes: {
+            number: 2634,
+            executionProgress: "COMPLETE",
+            completionStatus: "FAILED",
+            sourceCommit: {
+              commitSha: "abc123",
+              message: "Break build",
+              webUrl: "https://github.example/commit/abc123",
+            },
+          },
         },
+      } as T;
+    }
+
+    if (request.path === "/ciBuildRuns/build-run-1/actions") {
+      return {
+        data: [
+          {
+            id: "failed-action-1",
+            type: "ciBuildActions",
+            attributes: {
+              name: "Archive - iOS",
+              actionType: "ARCHIVE",
+              executionProgress: "COMPLETE",
+              completionStatus: "FAILED",
+              issueCounts: null,
+            },
+          },
+          {
+            id: "skipped-action-1",
+            type: "ciBuildActions",
+            attributes: {
+              name: "TestFlight Internal Testing - iOS",
+              actionType: "TEST",
+              executionProgress: "COMPLETE",
+              completionStatus: "SKIPPED",
+              issueCounts: null,
+            },
+          },
+        ],
+      } as T;
+    }
+
+    if (request.path === "/ciBuildActions/failed-action-1/issues") {
+      return {
+        data: [
+          {
+            id: "issue-1",
+            type: "ciIssues",
+            attributes: {
+              issueType: "ERROR",
+              fileSource: {
+                path: "file:///Volumes/workspace/repository/stepapp/Classes/ViewController/Main/TabBarViewController+Startup.swift",
+                lineNumber: 254,
+              },
+              message: "Modifier Order Violation: dynamic modifier should come before required (modifier_order)",
+              category: "Xcodebuild",
+            },
+          },
+        ],
       } as T;
     }
 
@@ -195,6 +253,7 @@ describe("MCP tools", () => {
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       "get_xcode_cloud_build_run",
       "get_xcode_cloud_workflow",
+      "inspect_xcode_cloud_build",
       "list_app_store_versions",
       "list_apps",
       "list_testflight_versions",
@@ -445,5 +504,75 @@ describe("MCP tools", () => {
         },
       },
     });
+  });
+
+  it("inspects a failed Xcode Cloud build without downloading artifacts", async () => {
+    const fakeAsc = new FakeAppStoreConnectClient();
+    const { client, close } = await connectTestClient(fakeAsc);
+    activeClient = { close };
+
+    const result = parseTextResult(
+      await client.callTool({
+        name: "inspect_xcode_cloud_build",
+        arguments: {
+          buildRunId: "build-run-1",
+        },
+      }),
+    );
+
+    expect(result.buildRun).toMatchObject({
+      id: "build-run-1",
+      number: 2634,
+      executionProgress: "COMPLETE",
+      completionStatus: "FAILED",
+    });
+    expect(result.actions).toEqual([
+      {
+        id: "failed-action-1",
+        type: "ciBuildActions",
+        name: "Archive - iOS",
+        actionType: "ARCHIVE",
+        executionProgress: "COMPLETE",
+        completionStatus: "FAILED",
+        issueCounts: null,
+        issuesFetched: true,
+        issueCount: 1,
+      },
+      {
+        id: "skipped-action-1",
+        type: "ciBuildActions",
+        name: "TestFlight Internal Testing - iOS",
+        actionType: "TEST",
+        executionProgress: "COMPLETE",
+        completionStatus: "SKIPPED",
+        issueCounts: null,
+        issuesFetched: false,
+        issueCount: 0,
+      },
+    ]);
+    expect(result.issues).toEqual([
+      {
+        actionId: "failed-action-1",
+        actionName: "Archive - iOS",
+        actionType: "ARCHIVE",
+        id: "issue-1",
+        type: "ciIssues",
+        attributes: {
+          issueType: "ERROR",
+          fileSource: {
+            path: "file:///Volumes/workspace/repository/stepapp/Classes/ViewController/Main/TabBarViewController+Startup.swift",
+            lineNumber: 254,
+          },
+          message: "Modifier Order Violation: dynamic modifier should come before required (modifier_order)",
+          category: "Xcodebuild",
+        },
+      },
+    ]);
+    expect(result.artifactsDownloaded).toBe(false);
+    expect(fakeAsc.calls.map((call) => call.path)).toEqual([
+      "/ciBuildRuns/build-run-1",
+      "/ciBuildRuns/build-run-1/actions",
+      "/ciBuildActions/failed-action-1/issues",
+    ]);
   });
 });

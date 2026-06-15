@@ -109,6 +109,7 @@ The `XCODECLOUD_MCP_BEARER_TOKEN` value must be available in both places:
 - `get_xcode_cloud_workflow`: fetch one Xcode Cloud workflow by id.
 - `list_xcode_cloud_build_runs`: list Xcode Cloud build runs for a workflow.
 - `get_xcode_cloud_build_run`: fetch one Xcode Cloud build run.
+- `inspect_xcode_cloud_build`: get build status and failed action issues without downloading artifacts.
 - `list_xcode_cloud_git_references`: list branch/tag references for a workflow repository.
 - `start_xcode_cloud_build`: start an Xcode Cloud build run for a workflow.
 - `start_xcode_cloud_build_for_branch`: start an Xcode Cloud build run by branch name.
@@ -167,3 +168,13 @@ Branch-name shortcut:
 ```
 
 `list_xcode_cloud_git_references` pages through App Store Connect's repository refs and returns `paging.hasMore`. For branch lookups, pass an exact `name`, `kind: "BRANCH"`, and keep `maxPages` at the default `20` unless you intentionally want a smaller scan.
+
+To inspect a failed build without downloading logs or artifacts:
+
+```json
+{
+  "buildRunId": "YOUR_BUILD_RUN_ID"
+}
+```
+
+Use `inspect_xcode_cloud_build`; it reads build-run status, actions, and failed action issues only.

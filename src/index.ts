@@ -263,6 +263,27 @@ export function createServer(appStoreConnect: AppStoreConnectApi = new AppStoreC
   );
 
   server.registerTool(
+    "inspect_xcode_cloud_build",
+    {
+      description: "Get Xcode Cloud build status and, if failed, read action issues without downloading artifacts.",
+      inputSchema: {
+        buildRunId: z.string().min(1),
+        includeSucceededActionIssues: z
+          .boolean()
+          .default(false)
+          .describe("Also fetch issues for succeeded/skipped actions. Defaults to failed actions only."),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ buildRunId, includeSucceededActionIssues }) => {
+      return withToolLogging("inspect_xcode_cloud_build", { buildRunId, includeSucceededActionIssues }, async () => {
+        const inspection = await inspectBuildRun(appStoreConnect, buildRunId, includeSucceededActionIssues);
+        return jsonContent(inspection);
+      });
+    },
+  );
+
+  server.registerTool(
     "list_xcode_cloud_git_references",
     {
       description: "List git references for an Xcode Cloud workflow repository. Use this to find branch or tag ids such as develop.",
@@ -429,6 +450,135 @@ type GitReference = {
     isDeleted?: boolean;
   };
 };
+
+type BuildRunResponse = {
+  data?: {
+    id: string;
+    type?: string;
+    attributes?: Record<string, unknown> & {
+      number?: number;
+      executionProgress?: string;
+      completionStatus?: string | null;
+      issueCounts?: unknown;
+      createdDate?: string;
+      startedDate?: string | null;
+      finishedDate?: string | null;
+      sourceCommit?: unknown;
+    };
+  };
+  included?: Array<{
+    id: string;
+    type?: string;
+    attributes?: Record<string, unknown>;
+  }>;
+};
+
+type BuildAction = {
+  id: string;
+  type?: string;
+  attributes?: Record<string, unknown> & {
+    name?: string;
+    actionType?: string;
+    executionProgress?: string;
+    completionStatus?: string | null;
+    issueCounts?: unknown;
+    startedDate?: string | null;
+    finishedDate?: string | null;
+  };
+};
+
+type Issue = {
+  id: string;
+  type?: string;
+  attributes?: Record<string, unknown>;
+};
+
+async function inspectBuildRun(
+  appStoreConnect: AppStoreConnectApi,
+  buildRunId: string,
+  includeSucceededActionIssues: boolean,
+): Promise<unknown> {
+  const buildRun = await appStoreConnect.get<BuildRunResponse>({
+    path: `/ciBuildRuns/${encodeURIComponent(buildRunId)}`,
+    query: { include: "workflow,builds" },
+  });
+
+  const actionsResponse = await appStoreConnect.get<{ data?: BuildAction[] }>({
+    path: `/ciBuildRuns/${encodeURIComponent(buildRunId)}/actions`,
+    query: { limit: 200 },
+  });
+
+  const actions = [];
+  const issues = [];
+
+  for (const action of actionsResponse.data ?? []) {
+    const attributes = action.attributes ?? {};
+    const shouldFetchIssues =
+      includeSucceededActionIssues ||
+      attributes.completionStatus === "FAILED" ||
+      attributes.completionStatus === "ERROR" ||
+      attributes.executionProgress === "FAILED";
+
+    let actionIssues: Issue[] = [];
+    let issuesError: string | undefined;
+
+    if (shouldFetchIssues) {
+      try {
+        const issuesResponse = await appStoreConnect.get<{ data?: Issue[] }>({
+          path: `/ciBuildActions/${encodeURIComponent(action.id)}/issues`,
+          query: { limit: 200 },
+        });
+        actionIssues = issuesResponse.data ?? [];
+        issues.push(
+          ...actionIssues.map((issue) => ({
+            actionId: action.id,
+            actionName: attributes.name,
+            actionType: attributes.actionType,
+            id: issue.id,
+            type: issue.type,
+            attributes: issue.attributes,
+          })),
+        );
+      } catch (error) {
+        issuesError = error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    actions.push({
+      id: action.id,
+      type: action.type,
+      name: attributes.name,
+      actionType: attributes.actionType,
+      executionProgress: attributes.executionProgress,
+      completionStatus: attributes.completionStatus,
+      issueCounts: attributes.issueCounts,
+      startedDate: attributes.startedDate,
+      finishedDate: attributes.finishedDate,
+      issuesFetched: shouldFetchIssues,
+      issueCount: actionIssues.length,
+      issuesError,
+    });
+  }
+
+  return {
+    buildRun: {
+      id: buildRun.data?.id,
+      type: buildRun.data?.type,
+      number: buildRun.data?.attributes?.number,
+      executionProgress: buildRun.data?.attributes?.executionProgress,
+      completionStatus: buildRun.data?.attributes?.completionStatus,
+      issueCounts: buildRun.data?.attributes?.issueCounts,
+      createdDate: buildRun.data?.attributes?.createdDate,
+      startedDate: buildRun.data?.attributes?.startedDate,
+      finishedDate: buildRun.data?.attributes?.finishedDate,
+      sourceCommit: buildRun.data?.attributes?.sourceCommit,
+    },
+    included: buildRun.included ?? [],
+    actions,
+    issues,
+    artifactsDownloaded: false,
+  };
+}
 
 async function listGitReferences(
   appStoreConnect: AppStoreConnectApi,
