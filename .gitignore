@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.p8
+AuthKey_*.p8
+.DS_Store
+npm-debug.log*

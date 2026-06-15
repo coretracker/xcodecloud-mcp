@@ -1,0 +1,421 @@
+{
+  "info": {
+    "_postman_id": "7f2a90d0-7c54-4b8e-89e6-xcodecloudmcp",
+    "name": "xcodecloud-mcp",
+    "description": "Postman collection for testing the xcodecloud-mcp Streamable HTTP MCP server.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "mcpEndpoint",
+      "value": "/mcp"
+    },
+    {
+      "key": "bearerToken",
+      "value": "change-me-to-match-XCODECLOUD_MCP_BEARER_TOKEN",
+      "type": "secret"
+    },
+    {
+      "key": "mcpSessionId",
+      "value": ""
+    },
+    {
+      "key": "appId",
+      "value": ""
+    },
+    {
+      "key": "bundleId",
+      "value": ""
+    },
+    {
+      "key": "workflowId",
+      "value": ""
+    },
+    {
+      "key": "buildRunId",
+      "value": ""
+    },
+    {
+      "key": "sourceBranchOrTagId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /healthz",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/healthz",
+              "host": ["{{baseUrl}}"],
+              "path": ["healthz"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "MCP Session",
+      "item": [
+        {
+          "name": "1. initialize",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const sessionId = pm.response.headers.get('mcp-session-id');",
+                  "if (sessionId) {",
+                  "  pm.collectionVariables.set('mcpSessionId', sessionId);",
+                  "}",
+                  "pm.test('initialize succeeded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.result).to.have.property('protocolVersion');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"2025-11-25\",\n    \"capabilities\": {},\n    \"clientInfo\": {\n      \"name\": \"postman\",\n      \"version\": \"1.0.0\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpEndpoint}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{mcpEndpoint}}"]
+            }
+          }
+        },
+        {
+          "name": "2. initialized notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}"
+              },
+              {
+                "key": "mcp-session-id",
+                "value": "{{mcpSessionId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"notifications/initialized\",\n  \"params\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpEndpoint}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{mcpEndpoint}}"]
+            }
+          }
+        },
+        {
+          "name": "3. tools/list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}"
+              },
+              {
+                "key": "mcp-session-id",
+                "value": "{{mcpSessionId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\",\n  \"params\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpEndpoint}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{mcpEndpoint}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tool Calls",
+      "item": [
+        {
+          "name": "list_apps",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}"
+              },
+              {
+                "key": "mcp-session-id",
+                "value": "{{mcpSessionId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 10,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"list_apps\",\n    \"arguments\": {\n      \"limit\": 20,\n      \"bundleId\": \"{{bundleId}}\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpEndpoint}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{mcpEndpoint}}"]
+            }
+          }
+        },
+        {
+          "name": "list_app_store_versions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}"
+              },
+              {
+                "key": "mcp-session-id",
+                "value": "{{mcpSessionId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 11,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"list_app_store_versions\",\n    \"arguments\": {\n      \"appId\": \"{{appId}}\",\n      \"limit\": 20,\n      \"platform\": \"IOS\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpEndpoint}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{mcpEndpoint}}"]
+            }
+          }
+        },
+        {
+          "name": "list_testflight_versions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}"
+              },
+              {
+                "key": "mcp-session-id",
+                "value": "{{mcpSessionId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 12,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"list_testflight_versions\",\n    \"arguments\": {\n      \"appId\": \"{{appId}}\",\n      \"limit\": 20,\n      \"platform\": \"IOS\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpEndpoint}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{mcpEndpoint}}"]
+            }
+          }
+        },
+        {
+          "name": "list_xcode_cloud_workflows",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}"
+              },
+              {
+                "key": "mcp-session-id",
+                "value": "{{mcpSessionId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 13,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"list_xcode_cloud_workflows\",\n    \"arguments\": {\n      \"appId\": \"{{appId}}\",\n      \"limit\": 50\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpEndpoint}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{mcpEndpoint}}"]
+            }
+          }
+        },
+        {
+          "name": "list_xcode_cloud_build_runs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}"
+              },
+              {
+                "key": "mcp-session-id",
+                "value": "{{mcpSessionId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 14,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"list_xcode_cloud_build_runs\",\n    \"arguments\": {\n      \"workflowId\": \"{{workflowId}}\",\n      \"limit\": 20\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpEndpoint}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{mcpEndpoint}}"]
+            }
+          }
+        },
+        {
+          "name": "get_xcode_cloud_build_run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}"
+              },
+              {
+                "key": "mcp-session-id",
+                "value": "{{mcpSessionId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 15,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"get_xcode_cloud_build_run\",\n    \"arguments\": {\n      \"buildRunId\": \"{{buildRunId}}\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpEndpoint}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{mcpEndpoint}}"]
+            }
+          }
+        },
+        {
+          "name": "start_xcode_cloud_build",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearerToken}}"
+              },
+              {
+                "key": "mcp-session-id",
+                "value": "{{mcpSessionId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 16,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"start_xcode_cloud_build\",\n    \"arguments\": {\n      \"workflowId\": \"{{workflowId}}\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{mcpEndpoint}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{mcpEndpoint}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
