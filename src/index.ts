@@ -663,6 +663,23 @@ export async function startStdioServer(): Promise<void> {
 export async function startHttpServer(): Promise<void> {
   const port = Number.parseInt(process.env.PORT ?? process.env.XCODECLOUD_MCP_PORT ?? process.env.TESTFLIGHT_MCP_PORT ?? "9932", 10);
   const endpoint = process.env.XCODECLOUD_MCP_ENDPOINT ?? process.env.TESTFLIGHT_MCP_ENDPOINT ?? "/mcp";
+  const app = createHttpApp(endpoint);
+
+  app.listen(port, (error?: Error) => {
+    if (error) {
+      logError("http_mcp_server_failed_to_start", error, { port, endpoint });
+      process.exit(1);
+    }
+    log("info", "http_mcp_server_listening", {
+      port,
+      endpoint,
+      authEnabled: Boolean(process.env.XCODECLOUD_MCP_BEARER_TOKEN ?? process.env.TESTFLIGHT_MCP_BEARER_TOKEN),
+      logLevel: process.env.XCODECLOUD_MCP_LOG_LEVEL ?? process.env.TESTFLIGHT_MCP_LOG_LEVEL ?? "debug",
+    });
+  });
+}
+
+export function createHttpApp(endpoint = process.env.XCODECLOUD_MCP_ENDPOINT ?? process.env.TESTFLIGHT_MCP_ENDPOINT ?? "/mcp") {
   const app = createMcpExpressApp();
   const transports: Record<string, StreamableHTTPServerTransport> = {};
 
@@ -684,6 +701,7 @@ export async function startHttpServer(): Promise<void> {
         transport = transports[sessionId];
       } else if (!sessionId && isInitializeRequest(req.body)) {
         transport = new StreamableHTTPServerTransport({
+          enableJsonResponse: true,
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (initializedSessionId) => {
             transports[initializedSessionId] = transport;
@@ -740,18 +758,7 @@ export async function startHttpServer(): Promise<void> {
     res.status(200).json({ ok: true, service: "xcodecloud-mcp" });
   });
 
-  app.listen(port, (error?: Error) => {
-    if (error) {
-      logError("http_mcp_server_failed_to_start", error, { port, endpoint });
-      process.exit(1);
-    }
-    log("info", "http_mcp_server_listening", {
-      port,
-      endpoint,
-      authEnabled: Boolean(process.env.XCODECLOUD_MCP_BEARER_TOKEN ?? process.env.TESTFLIGHT_MCP_BEARER_TOKEN),
-      logLevel: process.env.XCODECLOUD_MCP_LOG_LEVEL ?? process.env.TESTFLIGHT_MCP_LOG_LEVEL ?? "debug",
-    });
-  });
+  return app;
 }
 
 const transportMode =

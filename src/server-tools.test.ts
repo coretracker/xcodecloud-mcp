@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { AddressInfo } from "node:net";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 process.env.APP_STORE_CONNECT_ISSUER_ID = "issuer-id";
@@ -207,9 +208,10 @@ class FakeAppStoreConnectClient {
 }
 
 let createServer: typeof import("./index.js").createServer;
+let createHttpApp: typeof import("./index.js").createHttpApp;
 
 beforeAll(async () => {
-  ({ createServer } = await import("./index.js"));
+  ({ createServer, createHttpApp } = await import("./index.js"));
 });
 
 async function connectTestClient(fakeAsc: FakeAppStoreConnectClient) {
@@ -574,5 +576,65 @@ describe("MCP tools", () => {
       "/ciBuildRuns/build-run-1/actions",
       "/ciBuildActions/failed-action-1/issues",
     ]);
+  });
+
+  it("returns a direct JSON-RPC initialize response in HTTP mode", async () => {
+    const app = createHttpApp("/mcp");
+    const httpServer = await new Promise<ReturnType<typeof app.listen>>((resolve, reject) => {
+      const server = app.listen(0, "127.0.0.1", () => resolve(server));
+      server.once("error", reject);
+    });
+
+    try {
+      const { port } = httpServer.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: "POST",
+        headers: {
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-11-25",
+            capabilities: {},
+            clientInfo: {
+              name: "vitest",
+              version: "1.0.0",
+            },
+          },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("application/json");
+      expect(response.headers.get("mcp-session-id")).toBeTruthy();
+
+      const body = await response.json();
+      expect(body).toMatchObject({
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          protocolVersion: "2025-11-25",
+          serverInfo: {
+            name: "xcodecloud-mcp",
+            version: "0.1.0",
+          },
+        },
+      });
+    } finally {
+      if (!httpServer.listening) {
+        return;
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        httpServer.close((error?: Error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
   });
 });
