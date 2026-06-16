@@ -661,7 +661,7 @@ export async function startStdioServer(): Promise<void> {
 }
 
 export async function startHttpServer(): Promise<void> {
-  const port = Number.parseInt(process.env.PORT ?? process.env.XCODECLOUD_MCP_PORT ?? process.env.TESTFLIGHT_MCP_PORT ?? "3000", 10);
+  const port = Number.parseInt(process.env.PORT ?? process.env.XCODECLOUD_MCP_PORT ?? process.env.TESTFLIGHT_MCP_PORT ?? "9932", 10);
   const endpoint = process.env.XCODECLOUD_MCP_ENDPOINT ?? process.env.TESTFLIGHT_MCP_ENDPOINT ?? "/mcp";
   const app = createMcpExpressApp();
   const transports: Record<string, StreamableHTTPServerTransport> = {};

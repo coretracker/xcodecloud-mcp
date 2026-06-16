@@ -36,7 +36,7 @@ npm run start:http
 HTTP mode exposes:
 
 ```text
-http://localhost:3000/mcp
+http://localhost:9932/mcp
 ```
 
 Set `XCODECLOUD_MCP_BEARER_TOKEN` to require `Authorization: Bearer ...` for MCP requests.
@@ -81,7 +81,7 @@ Codex HTTP config example:
 
 ```toml
 [mcp_servers.xcodecloud]
-url = "http://localhost:3000/mcp"
+url = "http://localhost:9932/mcp"
 bearer_token_env_var = "XCODECLOUD_MCP_BEARER_TOKEN"
 enabled = true
 startup_timeout_sec = 20
@@ -92,7 +92,56 @@ For HTTP mode, run the MCP server separately:
 
 ```sh
 cd /Users/andreasehrlich-gruber/Documents/Repositories/xcodecloud-mcp
-XCODECLOUD_MCP_TRANSPORT=http npm run start
+PORT=9932 XCODECLOUD_MCP_TRANSPORT=http npm run start
+```
+
+## Docker
+
+Build the image:
+
+```sh
+docker build -t xcodecloud-mcp .
+```
+
+Run it in HTTP mode on port `9932`:
+
+```sh
+docker run --rm \
+  -p 9932:9932 \
+  -e APP_STORE_CONNECT_ISSUER_ID=... \
+  -e APP_STORE_CONNECT_KEY_ID=... \
+  -e APP_STORE_CONNECT_PRIVATE_KEY_PATH=/run/secrets/AuthKey_ABC123.p8 \
+  -e XCODECLOUD_MCP_BEARER_TOKEN=... \
+  -v /absolute/path/AuthKey_ABC123.p8:/run/secrets/AuthKey_ABC123.p8:ro \
+  xcodecloud-mcp
+```
+
+If you prefer not to mount a file, you can pass the private key inline with `APP_STORE_CONNECT_PRIVATE_KEY` instead.
+
+The container defaults to HTTP transport and exposes:
+
+```text
+http://localhost:9932/mcp
+http://localhost:9932/healthz
+```
+
+Compose example:
+
+```yaml
+services:
+  xcodecloud-mcp:
+    build: .
+    ports:
+      - "9932:9932"
+    environment:
+      APP_STORE_CONNECT_ISSUER_ID: ${APP_STORE_CONNECT_ISSUER_ID}
+      APP_STORE_CONNECT_KEY_ID: ${APP_STORE_CONNECT_KEY_ID}
+      APP_STORE_CONNECT_PRIVATE_KEY_PATH: /run/secrets/AuthKey_ABC123.p8
+      XCODECLOUD_MCP_BEARER_TOKEN: ${XCODECLOUD_MCP_BEARER_TOKEN}
+      XCODECLOUD_MCP_TRANSPORT: http
+      PORT: 9932
+    volumes:
+      - /absolute/path/AuthKey_ABC123.p8:/run/secrets/AuthKey_ABC123.p8:ro
 ```
 
 The `XCODECLOUD_MCP_BEARER_TOKEN` value must be available in both places:

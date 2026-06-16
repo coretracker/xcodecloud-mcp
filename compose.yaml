@@ -1,0 +1,15 @@
+services:
+  xcodecloud-mcp:
+    build:
+      context: .
+    ports:
+      - "9932:9932"
+    env_file:
+      - .env
+    environment:
+      APP_STORE_CONNECT_PRIVATE_KEY_PATH: /run/secrets/app-store-connect-key.p8
+      XCODECLOUD_MCP_TRANSPORT: http
+      PORT: 9932
+    volumes:
+      - ${APP_STORE_CONNECT_PRIVATE_KEY_PATH}:/run/secrets/app-store-connect-key.p8:ro
+    restart: unless-stopped
