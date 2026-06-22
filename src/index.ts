@@ -688,6 +688,29 @@ function normalizeMcpAcceptHeader(req: any): void {
   }
 }
 
+function parseAllowedHosts(value: string | undefined): string[] | undefined {
+  if (!value) return undefined;
+
+  const hosts = value
+    .split(",")
+    .map((host) => host.trim())
+    .filter((host) => host.length > 0);
+
+  return hosts.length > 0 ? hosts : undefined;
+}
+
+function httpAllowedHosts(): string[] {
+  return (
+    parseAllowedHosts(process.env.XCODECLOUD_MCP_ALLOWED_HOSTS ?? process.env.TESTFLIGHT_MCP_ALLOWED_HOSTS) ?? [
+      "localhost",
+      "127.0.0.1",
+      "[::1]",
+      "172.19.0.7",
+      "host.docker.internal",
+    ]
+  );
+}
+
 export async function startStdioServer(): Promise<void> {
   const server = createServer();
   const transport = new StdioServerTransport();
@@ -719,7 +742,7 @@ export async function startHttpServer(): Promise<void> {
 }
 
 export function createHttpApp(endpoint = process.env.XCODECLOUD_MCP_ENDPOINT ?? process.env.TESTFLIGHT_MCP_ENDPOINT ?? "/mcp") {
-  const app = createMcpExpressApp();
+  const app = createMcpExpressApp({ allowedHosts: httpAllowedHosts() });
   const transports: Record<string, StreamableHTTPServerTransport> = {};
 
   const handleMcpRequest = async (req: any, res: any): Promise<void> => {

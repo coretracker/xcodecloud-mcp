@@ -653,4 +653,16 @@ describe("MCP tools", () => {
     expect(response.headers.get("content-type")).toContain("application/json");
     expect(response.headers.get("mcp-session-id")).toBeTruthy();
   });
+
+  it("accepts Codex Docker bridge host headers in HTTP mode", async () => {
+    const response = await postInitializeRequest({
+      accept: "application/json, text/event-stream",
+      "content-type": "application/json",
+      host: "172.19.0.7:9932",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("mcp-session-id")).toBeTruthy();
+  });
 });

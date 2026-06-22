@@ -41,6 +41,12 @@ http://localhost:9932/mcp
 
 Set `XCODECLOUD_MCP_BEARER_TOKEN` to require `Authorization: Bearer ...` for MCP requests.
 
+HTTP mode validates the `Host` header before handling MCP requests. The default allowlist includes `localhost`, `127.0.0.1`, `[::1]`, `172.19.0.7`, and `host.docker.internal`. Override it when your Codex/Docker bridge host changes:
+
+```sh
+XCODECLOUD_MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],172.19.0.7,host.docker.internal
+```
+
 ## Logs
 
 The server writes verbose JSON logs to `stderr` so MCP messages on `stdout` stay valid.
