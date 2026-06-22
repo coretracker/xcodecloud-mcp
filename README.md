@@ -59,25 +59,49 @@ On the first successful authenticated App Store Connect API response, the server
 {"message":"app_store_connect_login_successful"}
 ```
 
-Codex STDIO config example:
+## Codex MCP setup
 
-```json
-{
-  "mcpServers": {
-    "xcodecloud": {
-      "command": "node",
-      "args": ["/absolute/path/to/xcodecloud-mcp/dist/index.js"],
-      "env": {
-        "APP_STORE_CONNECT_ISSUER_ID": "...",
-        "APP_STORE_CONNECT_KEY_ID": "...",
-        "APP_STORE_CONNECT_PRIVATE_KEY_PATH": "/absolute/path/AuthKey_ABC123.p8"
-      }
-    }
-  }
-}
+Codex reads MCP servers from `config.toml`, either globally at `~/.codex/config.toml` or in a trusted project at `.codex/config.toml`. Use a `[mcp_servers.<name>]` TOML table; the older `mcpServers` JSON shape is not used by Codex.
+
+STDIO config example:
+
+```toml
+[mcp_servers.xcodecloud]
+command = "node"
+args = ["/absolute/path/to/xcodecloud-mcp/dist/index.js"]
+cwd = "/absolute/path/to/xcodecloud-mcp"
+enabled = true
+startup_timeout_sec = 20
+tool_timeout_sec = 120
 ```
 
-Codex HTTP config example:
+The `cwd` value lets `dotenv` load the repo's `.env` file when the MCP server starts. If you prefer to keep credentials in the Codex process environment instead of `.env`, forward them explicitly:
+
+```toml
+[mcp_servers.xcodecloud]
+command = "node"
+args = ["/absolute/path/to/xcodecloud-mcp/dist/index.js"]
+cwd = "/absolute/path/to/xcodecloud-mcp"
+env_vars = [
+  "APP_STORE_CONNECT_ISSUER_ID",
+  "APP_STORE_CONNECT_KEY_ID",
+  "APP_STORE_CONNECT_PRIVATE_KEY",
+  "APP_STORE_CONNECT_PRIVATE_KEY_PATH"
+]
+enabled = true
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+```
+
+You can also add the stdio server with the Codex CLI:
+
+```sh
+codex mcp add xcodecloud -- node /absolute/path/to/xcodecloud-mcp/dist/index.js
+```
+
+Then add `cwd` and either `.env` or `env_vars` in `config.toml` as shown above.
+
+HTTP config example:
 
 ```toml
 [mcp_servers.xcodecloud]
@@ -86,6 +110,16 @@ bearer_token_env_var = "XCODECLOUD_MCP_BEARER_TOKEN"
 enabled = true
 startup_timeout_sec = 20
 tool_timeout_sec = 120
+```
+
+Because `start_xcode_cloud_build` and `start_xcode_cloud_build_for_branch` create real Xcode Cloud build runs, you can make Codex ask before using them:
+
+```toml
+[mcp_servers.xcodecloud.tools.start_xcode_cloud_build]
+approval_mode = "prompt"
+
+[mcp_servers.xcodecloud.tools.start_xcode_cloud_build_for_branch]
+approval_mode = "prompt"
 ```
 
 For HTTP mode, run the MCP server separately:
