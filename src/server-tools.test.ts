@@ -7,6 +7,8 @@ process.env.APP_STORE_CONNECT_ISSUER_ID = "issuer-id";
 process.env.APP_STORE_CONNECT_KEY_ID = "key-id";
 process.env.APP_STORE_CONNECT_PRIVATE_KEY = "unused-in-tests";
 process.env.XCODECLOUD_MCP_LOG_LEVEL = "error";
+process.env.XCODECLOUD_MCP_BEARER_TOKEN = "";
+process.env.TESTFLIGHT_MCP_BEARER_TOKEN = "";
 
 type AscCall = {
   method: "get" | "post";
@@ -228,6 +230,45 @@ async function connectTestClient(fakeAsc: FakeAppStoreConnectClient) {
       await server.close();
     },
   };
+}
+
+async function postInitializeRequest(headers: HeadersInit) {
+  const app = createHttpApp("/mcp");
+  const httpServer = await new Promise<ReturnType<typeof app.listen>>((resolve, reject) => {
+    const server = app.listen(0, "127.0.0.1");
+    server.once("listening", () => resolve(server));
+    server.once("error", reject);
+  });
+
+  try {
+    const { port } = httpServer.address() as AddressInfo;
+    return await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-11-25",
+          capabilities: {},
+          clientInfo: {
+            name: "vitest",
+            version: "1.0.0",
+          },
+        },
+      }),
+    });
+  } finally {
+    if (httpServer.listening) {
+      await new Promise<void>((resolve, reject) => {
+        httpServer.close((error?: Error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  }
 }
 
 function parseTextResult(result: Awaited<ReturnType<Client["callTool"]>>) {
@@ -579,62 +620,37 @@ describe("MCP tools", () => {
   });
 
   it("returns a direct JSON-RPC initialize response in HTTP mode", async () => {
-    const app = createHttpApp("/mcp");
-    const httpServer = await new Promise<ReturnType<typeof app.listen>>((resolve, reject) => {
-      const server = app.listen(0, "127.0.0.1", () => resolve(server));
-      server.once("error", reject);
+    const response = await postInitializeRequest({
+      accept: "application/json, text/event-stream",
+      "content-type": "application/json",
     });
 
-    try {
-      const { port } = httpServer.address() as AddressInfo;
-      const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
-        method: "POST",
-        headers: {
-          accept: "application/json, text/event-stream",
-          "content-type": "application/json",
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("mcp-session-id")).toBeTruthy();
+
+    const body = await response.json();
+    expect(body).toMatchObject({
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        protocolVersion: "2025-11-25",
+        serverInfo: {
+          name: "xcodecloud-mcp",
+          version: "0.1.0",
         },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: {
-            protocolVersion: "2025-11-25",
-            capabilities: {},
-            clientInfo: {
-              name: "vitest",
-              version: "1.0.0",
-            },
-          },
-        }),
-      });
+      },
+    });
+  });
 
-      expect(response.status).toBe(200);
-      expect(response.headers.get("content-type")).toContain("application/json");
-      expect(response.headers.get("mcp-session-id")).toBeTruthy();
+  it.each([
+    ["no explicit accept header", { "content-type": "application/json" }],
+    ["application/json only", { accept: "application/json", "content-type": "application/json" }],
+  ])("accepts HTTP initialize requests with %s", async (_name, headers) => {
+    const response = await postInitializeRequest(headers);
 
-      const body = await response.json();
-      expect(body).toMatchObject({
-        jsonrpc: "2.0",
-        id: 1,
-        result: {
-          protocolVersion: "2025-11-25",
-          serverInfo: {
-            name: "xcodecloud-mcp",
-            version: "0.1.0",
-          },
-        },
-      });
-    } finally {
-      if (!httpServer.listening) {
-        return;
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        httpServer.close((error?: Error) => {
-          if (error) reject(error);
-          else resolve();
-        });
-      });
-    }
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("mcp-session-id")).toBeTruthy();
   });
 });

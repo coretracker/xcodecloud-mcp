@@ -649,6 +649,45 @@ function isAuthorized(authorizationHeader: unknown): boolean {
   return scheme?.toLowerCase() === "bearer" && token === expectedToken;
 }
 
+function normalizeMcpAcceptHeader(req: any): void {
+  const requiredAcceptTypes = ["application/json", "text/event-stream"];
+  const currentHeader = req.headers.accept;
+  const headerValues = Array.isArray(currentHeader)
+    ? currentHeader.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : typeof currentHeader === "string" && currentHeader.trim().length > 0
+      ? [currentHeader]
+      : [];
+
+  const acceptedTypes = new Set(
+    headerValues.flatMap((value) =>
+      value
+        .split(",")
+        .map((part) => part.trim().split(";")[0]?.toLowerCase())
+        .filter((part): part is string => Boolean(part)),
+    ),
+  );
+  const missingAcceptTypes = requiredAcceptTypes.filter((type) => !acceptedTypes.has(type));
+
+  if (missingAcceptTypes.length === 0) {
+    return;
+  }
+
+  const normalizedAcceptHeader = [...headerValues, ...missingAcceptTypes].join(", ");
+  req.headers.accept = normalizedAcceptHeader;
+
+  if (Array.isArray(req.rawHeaders)) {
+    const acceptHeaderIndex = req.rawHeaders.findIndex((value: unknown, index: number) => {
+      return index % 2 === 0 && typeof value === "string" && value.toLowerCase() === "accept";
+    });
+
+    if (acceptHeaderIndex >= 0) {
+      req.rawHeaders[acceptHeaderIndex + 1] = normalizedAcceptHeader;
+    } else {
+      req.rawHeaders.push("accept", normalizedAcceptHeader);
+    }
+  }
+}
+
 export async function startStdioServer(): Promise<void> {
   const server = createServer();
   const transport = new StdioServerTransport();
@@ -692,6 +731,8 @@ export function createHttpApp(endpoint = process.env.XCODECLOUD_MCP_ENDPOINT ?? 
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
+
+    normalizeMcpAcceptHeader(req);
 
     const sessionId = req.headers["mcp-session-id"];
     try {
